@@ -471,7 +471,7 @@ __noinline int parse_footer(struct bpf_xrp *context, uint64_t footer_offset) {
         }
 
         // read checksum type
-        footer.checksum = *(uint8_t *)(footer_ptr + footer_ptr_offset);
+        footer.checksum = *(uint8_t *)(footer_ptr + footer_offset);
         if (!valid_checksum_type(footer.checksum)) {
             bpf_printk("Invalid checksum type: %u", footer.checksum);
             return -EBPF_EINVAL;
