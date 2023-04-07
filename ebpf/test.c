@@ -11,9 +11,12 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <linux/bpf.h>
+#include <linux/mman.h>
 
 #include "ebpf.h"
 #include "rocksdb_parser.h"
+
+const size_t huge_page_size = 1UL << 21UL;
 
 static void die(const char *message) {
     perror(message);
@@ -48,7 +51,6 @@ int main(int argc, char **argv) {
     uint64_t offset;
     struct stat st;
     struct rocksdb_ebpf_context ctx;
-    const size_t huge_page_size = 1 << 21;
 
     if (argc != 3) {
         printf("usage: ./test <sst-file> <key>\n");
@@ -72,34 +74,14 @@ int main(int argc, char **argv) {
         die("fstat() failed");
 
     offset = ((st.st_size - MAX_FOOTER_LEN) / EBPF_BLOCK_SIZE) * EBPF_BLOCK_SIZE;
-    // (MAX(1, (st.st_size / EBPF_BLOCK_SIZE)) - 1) * EBPF_BLOCK_SIZE;
-    //offset = st.st_size - MAX_FOOTER_LEN;
     printf("footer offset (aligned to 512): %ld\n", offset);
 
-    /*if (posix_memalign((void **) &data_buf, 4096, EBPF_DATA_BUFFER_SIZE) != 0)
+    data_buf = mmap(NULL, huge_page_size, PROT_READ | PROT_WRITE, MAP_HUGETLB | MAP_HUGE_2MB | MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (data_buf == MAP_FAILED)
+        die("mmap() failed");
+
+    if (posix_memalign((void **) &scratch_buf, EBPF_SCRATCH_BUFFER_SIZE, EBPF_DATA_BUFFER_SIZE) != 0)
         die("posix_memalign() failed");
-    */
-
-    data_buf = aligned_alloc(EBPF_DATA_BUFFER_SIZE, EBPF_DATA_BUFFER_SIZE);
-    if (!data_buf)
-        die("aligned_alloc() failed");
-
-    /*data_buf = aligned_alloc(EBPF_DATA_BUFFER_SIZE, EBPF_DATA_BUFFER_SIZE);
-    if (!data_buf)
-        die("aligned_alloc() failed");
-    */
-
-    // use madvise to ask for transparent huge page
-    if (posix_memalign((void **) &scratch_buf, huge_page_size, EBPF_SCRATCH_BUFFER_SIZE) != 0)
-        die("posix_memalign() failed");
-
-    if (madvise(scratch_buf, EBPF_SCRATCH_BUFFER_SIZE, MADV_HUGEPAGE) != 0)
-        die("madvise(..., MADV_HUGEPAGE) failed");
-
-    /*scratch_buf = aligned_alloc(EBPF_SCRATCH_BUFFER_SIZE, EBPF_SCRATCH_BUFFER_SIZE);
-    if (!scratch_buf)
-        die("aligned_alloc() failed");
-    */
 
     memset(data_buf, 0, EBPF_DATA_BUFFER_SIZE);
     memset(scratch_buf, 0, EBPF_SCRATCH_BUFFER_SIZE);
@@ -128,12 +110,11 @@ int main(int argc, char **argv) {
     ctx = *(struct rocksdb_ebpf_context *)scratch_buf;
 
     if (ctx.found == 1)
-        //print_block_handle(&ctx.handle);
         printf("Value found: %s\n", ctx.data_context.value);
     else
         printf("Value not found\n");
 
-    free(data_buf);
+    munmap(data_buf, EBPF_DATA_BUFFER_SIZE);
     free(scratch_buf);
 
     close(out_fd);

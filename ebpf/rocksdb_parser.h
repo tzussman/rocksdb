@@ -19,6 +19,8 @@
 #include <stdint.h>
 #endif
 
+#define PAGE_SIZE 4096
+
 // Footer member sizes
 #define CHECKSUM_LEN 1
 #define MAX_VARINT64_LEN 10 // kMaxVarint64Length = 10
@@ -38,6 +40,8 @@
 #define BLOCK_MAGIC_NUMBER 0x88e241b785f4cff7ull // kBlockBasedTableMagicNumber
 #define LEGACY_BLOCK_MAGIC_NUMBER 0xdb4775248b80fb57ull // kLegacyBlockBasedTableMagicNumber
 #define NULL_BLOCK_MAGIC_NUMBER 0
+
+#define ROCKSDB_BLOCK_SIZE 4096
 
 // Checksum parsing
 enum checksum_type {
@@ -167,6 +171,7 @@ struct data_parse_context {
     unsigned char value[MAX_VALUE_LEN + 1];
     uint32_t data_offset;
     enum value_type vt;
+    uint64_t seq;
 };
 
 struct rocksdb_ebpf_context {
@@ -174,6 +179,7 @@ struct rocksdb_ebpf_context {
     enum parse_stage stage;
     int found;
     char key[MAX_KEY_LEN + 1];
+    char temp_key[MAX_KEY_LEN + 1]; // used for comparisons
     struct block_handle handle;
     union varint_context varint_context;
     union {
