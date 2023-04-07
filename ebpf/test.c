@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
     strncpy((char *)&ctx.key, key, strlen(key));
     memcpy(scratch_buf, &ctx, sizeof(ctx));
 
-    long ret = syscall(SYS_READ_XRP, sst_fd, data_buf, EBPF_DATA_BUFFER_SIZE, offset, bpf_fd, scratch_buf);
+    long ret = syscall(SYS_READ_XRP, sst_fd, data_buf, 4096, offset, bpf_fd, scratch_buf);
 
     printf("Return: %ld\n", ret);
     printf("%s\n", strerror(errno));
