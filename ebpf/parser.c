@@ -208,7 +208,7 @@ __noinline int data_block_loop(struct bpf_xrp *context, uint32_t data_offset) {
     return 1;
 }
 
-__noinline int parse_data_block(struct bpf_xrp *context, uint32_t data_block_offset) {
+__noinline int parse_data_block(struct bpf_xrp *context, const uint32_t data_block_offset) {
     uint8_t *data_block, index_type;
     uint32_t num_restarts, data_end, *block_footer, data_offset = data_block_offset, block_end_offset;
     struct rocksdb_ebpf_context *rocksdb_ctx = (struct rocksdb_ebpf_context *)context->scratch;
@@ -355,7 +355,7 @@ __noinline int index_block_loop(struct bpf_xrp *context, uint32_t index_offset) 
 }
 
 // index_block_offset is initial offset to index, index_ptr_offset is where we are now
-__noinline int parse_index_block_loop(struct bpf_xrp *context, uint64_t index_block_offset, uint64_t index_ptr_offset, uint32_t num_restarts, int *found) {
+__noinline int parse_index_block_loop(struct bpf_xrp *context, const uint64_t index_block_offset, uint64_t index_ptr_offset, uint32_t num_restarts, int *found) {
     int loop_ret, loop_counter = 0;
     const int LOOP_COUNTER_THRESH = 2500;
     uint32_t index_end;
@@ -384,7 +384,7 @@ __noinline int parse_index_block_loop(struct bpf_xrp *context, uint64_t index_bl
     return 0;
 }
 
-__noinline int parse_index_block(struct bpf_xrp *context, uint32_t index_block_offset) {
+__noinline int parse_index_block(struct bpf_xrp *context, const uint32_t index_block_offset) {
     uint8_t *index_block, index_type;
     int loop_ret, found = 0, i;
     const int LOOP_COUNTER_THRESH = 2000;
@@ -443,7 +443,7 @@ __noinline int parse_index_block(struct bpf_xrp *context, uint32_t index_block_o
     bpf_printk("Address for data block: %llu\n", context->next_addr[0]);
     rocksdb_ctx->footer_len = rocksdb_ctx->handle.offset - context->next_addr[0]; // can also mask with EBPF_BLOCK_SIZE - 1
     data_size = rocksdb_ctx->footer_len + rocksdb_ctx->handle.size + kBlockTrailerSize;
-    context->size[0] = __ALIGN_KERNEL(data_size, EBPF_BLOCK_SIZE);
+    context->size[0] = __ALIGN_KERNEL(data_size, PAGE_SIZE);
     bpf_printk("data block size: %llu\n", context->size[0]);
     bpf_printk("data block offset: %llu\n", rocksdb_ctx->footer_len);
     context->done = false;
@@ -451,7 +451,7 @@ __noinline int parse_index_block(struct bpf_xrp *context, uint32_t index_block_o
     return found;
 }
 
-__noinline int parse_footer(struct bpf_xrp *context, uint64_t footer_offset) {
+__noinline int parse_footer(struct bpf_xrp *context, const uint64_t footer_offset) {
     const uint8_t *footer_ptr = context->data;
     uint32_t varint_return;
     uint64_t index_size, footer_ptr_offset = footer_offset;
@@ -539,7 +539,7 @@ __noinline int parse_footer(struct bpf_xrp *context, uint64_t footer_offset) {
     bpf_printk("Index block offset: %d\n", context->next_addr[0]);
     rocksdb_ctx->footer_len = footer.index_handle.offset - context->next_addr[0];
     index_size = rocksdb_ctx->footer_len + footer.index_handle.size + kBlockTrailerSize;
-    context->size[0] = __ALIGN_KERNEL(index_size, EBPF_BLOCK_SIZE);
+    context->size[0] = __ALIGN_KERNEL(index_size, PAGE_SIZE);
     context->done = false;
 
     return 0;
