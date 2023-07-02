@@ -578,7 +578,7 @@ __noinline int next_sst_file(struct bpf_xrp *context) {
 
     context->fd_arr[0] = rocksdb_ctx->file_array.array[curr_idx].fd;
     context->next_addr[0] = round_down(rocksdb_ctx->file_array.array[curr_idx].offset, EBPF_BLOCK_SIZE);
-    context->size[0] = __ALIGN_KERNEL(data_size, PAGE_SIZE);
+    context->size[0] = __ALIGN_KERNEL(data_size, EBPF_BLOCK_SIZE);
     context->done = false;
     return 0;
 }

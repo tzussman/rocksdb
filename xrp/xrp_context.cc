@@ -115,7 +115,8 @@ Status XRPContext::Get(const Slice &key, Slice &value, GetContext *get_context, 
 
         request_size = (request_size + (EBPF_BLOCK_SIZE - 1)) & ~(EBPF_BLOCK_SIZE - 1);
     } else if (ctx->stage == kIndexStage) {
-        request_size = ctx->handle.size;
+        request_size = ctx->footer_len + ctx->handle.size + BlockBasedTable::kBlockTrailerSize;
+        request_size = (request_size + (EBPF_BLOCK_SIZE - 1)) & ~(EBPF_BLOCK_SIZE - 1);
     } else {
         request_size = 4096;
     }
@@ -182,8 +183,7 @@ void XRPContext::AddFile(const BlockBasedTable &sst, struct file_context &cache_
         offset = (index_handle.offset() / EBPF_BLOCK_SIZE) * EBPF_BLOCK_SIZE;
         footer_len = index_handle.offset() - offset;
 
-        size = footer_len + index_handle.size() + BlockBasedTable::kBlockTrailerSize;
-        size = (size + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
+        size = index_handle.size();
         stage = kIndexStage;
     }
 
