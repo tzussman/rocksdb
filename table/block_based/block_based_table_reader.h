@@ -138,7 +138,8 @@ class BlockBasedTable : public TableReader {
 
   Status CacheGet(const Slice& key, 
              GetContext* get_context, const SliceTransform* prefix_extractor,
-             bool skip_filters = false, struct file_context* xrp_file = nullptr);
+             bool &block_missing, bool skip_filters = false,
+             struct file_context* xrp_file = nullptr);
     
   // @param skip_filters Disables loading/accessing the filter block
   Status Get(const ReadOptions& readOptions, const Slice& key,

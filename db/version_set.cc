@@ -2307,6 +2307,7 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
   Slice *s; // value will be stored in slice
   BlockBasedTable *bbt = nullptr; 
   Cache::Handle* handle = nullptr;
+  bool block_missing = false;
 
   while (f != nullptr) {
     if (*max_covering_tombstone_seq > 0) {
@@ -2348,20 +2349,22 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
       // sample the disk - regular read path to populate cache
       *status = bbt->Get(read_options, ikey, &get_context, mutable_cf_options_.prefix_extractor.get(), skip_filters);
 
-
       if (!status->ok()) {
         if (db_statistics_ != nullptr) {
           get_context.ReportCounters();
         }
         goto exit;
       }
-    } else {
+    } else if (!block_missing) {
       // only look in cache. we don't care about status
-      *status = bbt->CacheGet(ikey, &get_context, mutable_cf_options_.prefix_extractor.get(), skip_filters, &xrp_file);
+      *status = bbt->CacheGet(ikey, &get_context, mutable_cf_options_.prefix_extractor.get(), block_missing, skip_filters, &xrp_file);
+    } else {
+      // Don't keep looking in cache, but add files to XRPContext
+      xrp_file.stage = kIndexStage;
     }
-    
-    if (get_context.State() == GetContext::kFound 
-      || get_context.State() == GetContext::kDeleted 
+
+    if (get_context.State() == GetContext::kFound
+      || get_context.State() == GetContext::kDeleted
       || get_context.State() == GetContext::kCorrupt) {
       goto get_out;
     }
@@ -2371,6 +2374,8 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
       xrp->AddFile(*bbt, xrp_file);
 
     f = fp.GetNextFile();
+    if (fp.GetCurrentLevel() == 0)
+        block_missing = false;
   }
 
   // if using XRP, make the request

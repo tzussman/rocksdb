@@ -2159,7 +2159,7 @@ Status BlockBasedTable::ApproximateKeyAnchors(const ReadOptions& read_options,
 
 Status BlockBasedTable::CacheGet(const Slice& key,
                             GetContext* get_context,
-                            const SliceTransform* prefix_extractor,
+                            const SliceTransform* prefix_extractor, bool &block_missing,
                             bool skip_filters, struct file_context* xrp_file) {
   assert(key.size() >= 8);  // key must be internal key
   assert(get_context != nullptr);
@@ -2206,8 +2206,8 @@ Status BlockBasedTable::CacheGet(const Slice& key,
                         get_context, &lookup_context);
 
   if (iiter->status().IsIncomplete()) {
-    // We were able to look up the index block, start parsing at data block
-    //hasIndex = true;
+    // Index block not in cache, don't check any more files in cache
+    block_missing = true;
     xrp_file->stage = kIndexStage;
     return Status::OK();
   }
@@ -2257,6 +2257,8 @@ Status BlockBasedTable::CacheGet(const Slice& key,
       /* XRP, we remove this because it sets key to found */
       //get_context->MarkKeyMayExist();
 
+      // XRP: don't check any other files in cache
+      block_missing = true;
       s = biter.status();
       break;
     }

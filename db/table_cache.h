@@ -105,7 +105,7 @@ class TableCache {
       const FileMetaData& file_meta, const Slice& k, GetContext* get_context,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
       HistogramImpl* file_read_hist = nullptr, bool skip_filters = false,
-      int level = -1, size_t max_file_size_for_l0_meta_pin = 0, bool sample = false, struct file_context* xrp_file = nullptr);
+      int level = -1, size_t max_file_size_for_l0_meta_pin = 0);
 
   // Return the range delete tombstone iterator of the file specified by
   // `file_meta`.
