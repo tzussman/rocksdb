@@ -31,10 +31,12 @@
 #if defined(OS_LINUX) || defined(OS_ANDROID)
 #include <sys/statfs.h>
 #include <sys/sysmacros.h>
+#include <sys/uio.h>
 #endif
 #include "monitoring/iostats_context_imp.h"
 #include "port/port.h"
 #include "port/stack_trace.h"
+#include "rocksdb/env.h"
 #include "rocksdb/slice.h"
 #include "test_util/sync_point.h"
 #include "util/autovector.h"
@@ -252,7 +254,7 @@ IOStatus PosixSequentialFile::Read(size_t n, const IOOptions& /*opts*/,
 }
 
 IOStatus PosixSequentialFile::PositionedRead(uint64_t offset, size_t n,
-                                             const IOOptions& /*opts*/,
+                                             const IOOptions& opts,
                                              Slice* result, char* scratch,
                                              IODebugContext* /*dbg*/) {
   assert(use_direct_io());
@@ -260,12 +262,18 @@ IOStatus PosixSequentialFile::PositionedRead(uint64_t offset, size_t n,
   assert(IsSectorAligned(n, GetRequiredBufferAlignment()));
   assert(IsSectorAligned(scratch, GetRequiredBufferAlignment()));
 
+  int flags = 0;
+  if (opts.io_activity == Env::IOActivity::kCompaction) {
+    flags |= RWF_DONTCACHE;
+  }
+
   IOStatus s;
   ssize_t r = -1;
   size_t left = n;
   char* ptr = scratch;
   while (left > 0) {
-    r = pread(fd_, ptr, left, static_cast<off_t>(offset));
+    struct iovec iov = {ptr, left};
+    r = preadv2(fd_, &iov, 1, static_cast<off_t>(offset), flags);
     if (r <= 0) {
       if (r == -1 && errno == EINTR) {
         continue;
@@ -608,7 +616,7 @@ PosixRandomAccessFile::PosixRandomAccessFile(
 PosixRandomAccessFile::~PosixRandomAccessFile() { close(fd_); }
 
 IOStatus PosixRandomAccessFile::Read(uint64_t offset, size_t n,
-                                     const IOOptions& /*opts*/, Slice* result,
+                                     const IOOptions& opts, Slice* result,
                                      char* scratch,
                                      IODebugContext* /*dbg*/) const {
   if (use_direct_io()) {
@@ -616,12 +624,19 @@ IOStatus PosixRandomAccessFile::Read(uint64_t offset, size_t n,
     assert(IsSectorAligned(n, GetRequiredBufferAlignment()));
     assert(IsSectorAligned(scratch, GetRequiredBufferAlignment()));
   }
+
+  int flags = 0;
+  if (opts.io_activity == Env::IOActivity::kCompaction) {
+    flags |= RWF_DONTCACHE;
+  }
+
   IOStatus s;
   ssize_t r = -1;
   size_t left = n;
   char* ptr = scratch;
   while (left > 0) {
-    r = pread(fd_, ptr, left, static_cast<off_t>(offset));
+    struct iovec iov = {ptr, left};
+    r = preadv2(fd_, &iov, 1, static_cast<off_t>(offset), flags);
     if (r <= 0) {
       if (r == -1 && errno == EINTR) {
         continue;
